@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useOntologyStore } from './store';
-import { DynamicPosture, PerceptualCapabilities, FunctionalCapabilities } from './types';
+import { DynamicPosture, PerceptualCapabilities, FunctionalCapabilities, WorldState } from './types';
 
 interface ProposedMutation {
   dynamic_posture?: Partial<DynamicPosture>;
   perceptual_capabilities?: Partial<PerceptualCapabilities>;
   functional_capabilities?: Partial<FunctionalCapabilities>;
+  world_state?: Partial<WorldState>;
 }
 
 export function useBicameralLoop() {
@@ -46,26 +47,8 @@ export function useBicameralLoop() {
         currentState.applySmoothedPosture(proposedMutation.dynamic_posture);
       }
       
-      // Update capabilities
-      const updates: any = {};
-      
-      if (proposedMutation.perceptual_capabilities) {
-        updates.perceptual_capabilities = {
-          ...currentState.perceptual_capabilities,
-          ...proposedMutation.perceptual_capabilities,
-        };
-      }
-      
-      if (proposedMutation.functional_capabilities) {
-        updates.functional_capabilities = {
-          ...currentState.functional_capabilities,
-          ...proposedMutation.functional_capabilities,
-        };
-      }
-
-      if (Object.keys(updates).length > 0) {
-        useOntologyStore.setState(updates);
-      }
+      // Update capabilities and world state using deep merge
+      currentState.applyMutation(proposedMutation);
 
       // Update interaction timestamp
       useOntologyStore.setState((state) => ({

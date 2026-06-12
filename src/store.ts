@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { OntologyStoreState, DynamicPosture } from './types';
+import { OntologyStoreState, DynamicPosture, PerceptualCapabilities, FunctionalCapabilities, WorldState } from './types';
 
 interface OntologyState extends OntologyStoreState {
+  applyMutation: (proposedMutation: any) => void;
   applySmoothedPosture: (proposedPosture: Partial<DynamicPosture>) => void;
 }
 
@@ -32,8 +33,46 @@ export const useOntologyStore = create<OntologyState>((set) => ({
     },
     environment_manifest: [],
   },
+  
+  applyMutation: (proposedMutation) =>
+    set((state) => {
+      const updates: any = {};
+
+      if (proposedMutation?.perceptual_capabilities) {
+        updates.perceptual_capabilities = {
+          ...state.perceptual_capabilities,
+          ...proposedMutation.perceptual_capabilities,
+        };
+      }
+
+      if (proposedMutation?.functional_capabilities) {
+        updates.functional_capabilities = {
+          ...state.functional_capabilities,
+          ...proposedMutation.functional_capabilities,
+        };
+      }
+
+      if (proposedMutation?.world_state) {
+        updates.world_state = {
+          ...state.world_state,
+          ...proposedMutation.world_state,
+        };
+        // Ensure nested identity is also merged safely
+        if (proposedMutation.world_state.identity) {
+          updates.world_state.identity = {
+            ...state.world_state.identity,
+            ...proposedMutation.world_state.identity,
+          };
+        }
+      }
+
+      return updates;
+    }),
+
   applySmoothedPosture: (proposedPosture) =>
     set((state) => {
+      if (!proposedPosture) return {};
+
       const alpha = 0.6;
       const beta = 0.4;
       

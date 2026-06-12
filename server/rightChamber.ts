@@ -89,23 +89,29 @@ ${userInput}`;
   }
 
   if (!response.text) {
-    throw new Error("No response returned from the model");
+    console.error("No response returned from the model");
+    return currentState;
   }
 
   let rawText = response.text.trim();
-  if (rawText.startsWith('```json')) {
-    rawText = rawText.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
-  } else if (rawText.startsWith('```')) {
-    rawText = rawText.replace(/^```\n?/, '').replace(/\n?```$/, '').trim();
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    rawText = jsonMatch[0];
+  } else {
+    // If no curly braces found at all, try the old fallback
+    if (rawText.startsWith('```json')) {
+      rawText = rawText.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+    } else if (rawText.startsWith('```')) {
+      rawText = rawText.replace(/^```\n?/, '').replace(/\n?```$/, '').trim();
+    }
   }
 
   try {
-    return JSON.parse(rawText);
+    const parsed = JSON.parse(rawText);
+    return parsed.proposed_mutation || parsed;
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      console.error("SyntaxError parsing JSON from Right Chamber:", error);
-      console.error("Raw text was:", response.text);
-    }
-    throw error;
+    console.error("SyntaxError parsing JSON from Right Chamber:", error);
+    console.error("Raw text was:", response.text);
+    return currentState;
   }
 }
