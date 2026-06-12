@@ -27,9 +27,9 @@ async function startServer() {
       }
       const proposedMutation = await evaluateState(userInput, currentState);
       res.json(proposedMutation);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Right Chamber Error:", error);
-      res.status(500).json({ error: "Failed to evaluate state" });
+      res.status(500).json({ error: "Failed to evaluate state: " + (error?.message || String(error)) });
     }
   });
 
@@ -42,9 +42,9 @@ async function startServer() {
       }
       const reply = await generateDialogue(userInput, currentState);
       res.json({ reply });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Left Chamber Error:", error);
-      res.status(500).json({ error: "Failed to generate dialogue" });
+      res.status(500).json({ error: "Failed to generate dialogue: " + (error?.message || String(error)) });
     }
   });
 

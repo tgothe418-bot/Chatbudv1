@@ -62,16 +62,22 @@ ${JSON.stringify(currentState, null, 2)}
 User Input:
 ${userInput}`;
 
-  const response = await gemini.models.generateContent({
-    model: 'gemini-1.5-flash',
-    contents: prompt,
-    config: {
-      systemInstruction,
-      responseMimeType: 'application/json',
-      responseSchema,
-      temperature: 0.1,
-    }
-  });
+  let response;
+  try {
+    response = await gemini.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        systemInstruction,
+        responseMimeType: 'application/json',
+        responseSchema,
+        temperature: 0.1,
+      }
+    });
+  } catch (error) {
+    console.error("Right Chamber Gemini API Error:", error);
+    throw error;
+  }
 
   if (!response.text) {
     throw new Error("No response returned from the model");

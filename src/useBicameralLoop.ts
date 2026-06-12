@@ -100,7 +100,7 @@ export function useBicameralLoop() {
       return replyData.reply;
 
     } catch (err: any) {
-      console.error(err);
+      console.error('Full Error:', err);
       setError(err.message || 'An error occurred in the bicameral loop');
       throw err;
     } finally {
