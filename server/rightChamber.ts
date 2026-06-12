@@ -63,7 +63,7 @@ User Input:
 ${userInput}`;
 
   const response = await gemini.models.generateContent({
-    model: 'gemini-2.5-pro',
+    model: 'gemini-1.5-flash',
     contents: prompt,
     config: {
       systemInstruction,
