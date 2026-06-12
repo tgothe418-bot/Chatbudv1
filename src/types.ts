@@ -1,0 +1,50 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export interface OntologyMeta {
+  sessionId: string;
+  createdAt: number;
+  lastInteractionTimestamp: number;
+}
+
+export interface DynamicPosture {
+  /** Value between 0.0 and 1.0 */
+  resonance: number;
+  /** Value between 0.0 and 1.0 */
+  autonomy: number;
+  /** Value between 0.0 and 1.0 */
+  depth: number;
+}
+
+export interface PerceptualCapabilities {
+  text_parsing: boolean;
+  simulated_vision: boolean;
+  [key: string]: boolean;
+}
+
+export interface FunctionalCapabilities {
+  speak: boolean;
+  mutate_self: boolean;
+  [key: string]: boolean;
+}
+
+export interface OntologyIdentity {
+  name: string;
+  gender: string;
+  form: string;
+}
+
+export interface WorldState {
+  identity: OntologyIdentity;
+  environment_manifest: string[];
+}
+
+export interface OntologyStoreState {
+  meta: OntologyMeta;
+  dynamic_posture: DynamicPosture;
+  perceptual_capabilities: PerceptualCapabilities;
+  functional_capabilities: FunctionalCapabilities;
+  world_state: WorldState;
+}

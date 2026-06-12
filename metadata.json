@@ -1,0 +1,6 @@
+{
+  "name": "Bicameral Chatbot",
+  "description": "A bicameral chatbot architecture separating state evaluation from dialogue generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
