@@ -36,21 +36,26 @@ export const useOntologyStore = create<OntologyState>((set) => ({
     set((state) => {
       const alpha = 0.6;
       const beta = 0.4;
+      
+      const newPosture = {
+        resonance:
+          proposedPosture.resonance !== undefined
+            ? alpha * proposedPosture.resonance + beta * state.dynamic_posture.resonance
+            : state.dynamic_posture.resonance,
+        autonomy:
+          proposedPosture.autonomy !== undefined
+            ? alpha * proposedPosture.autonomy + beta * state.dynamic_posture.autonomy
+            : state.dynamic_posture.autonomy,
+        depth:
+          proposedPosture.depth !== undefined
+            ? alpha * proposedPosture.depth + beta * state.dynamic_posture.depth
+            : state.dynamic_posture.depth,
+      };
+
+      console.log('--- Posture Tuning Step --- \n Proposed:', proposedPosture, '\n Smoothed Actual:', newPosture);
+
       return {
-        dynamic_posture: {
-          resonance:
-            proposedPosture.resonance !== undefined
-              ? alpha * proposedPosture.resonance + beta * state.dynamic_posture.resonance
-              : state.dynamic_posture.resonance,
-          autonomy:
-            proposedPosture.autonomy !== undefined
-              ? alpha * proposedPosture.autonomy + beta * state.dynamic_posture.autonomy
-              : state.dynamic_posture.autonomy,
-          depth:
-            proposedPosture.depth !== undefined
-              ? alpha * proposedPosture.depth + beta * state.dynamic_posture.depth
-              : state.dynamic_posture.depth,
-        },
+        dynamic_posture: newPosture,
       };
     }),
 }));
