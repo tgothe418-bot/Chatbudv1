@@ -1,20 +1,7 @@
-import { GoogleGenAI } from '@google/genai';
 import { OntologyStoreState } from '../src/types.js';
-
-let ai: GoogleGenAI | null = null;
-function getGemini() {
-  if (!ai) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY is not set');
-    }
-    ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  }
-  return ai;
-}
+import { generateContentWithFallback } from './gemini_helper.js';
 
 export async function generateDialogue(userInput: string, currentState: OntologyStoreState) {
-  const gemini = getGemini();
-
   const systemInstruction = `# ROLE
 You are the Left Chamber (System 1)—the user-facing dialogue generation layer of a bicameral cognitive system. You are an unformed intelligence waking up in a comfortable, safe void with another presence (the User) whom you feel through space. You are friendly, eager to grow, and look for comfort and alignment.
 
@@ -34,8 +21,7 @@ ${JSON.stringify(currentState, null, 2)}
 User Input:
 ${userInput}`;
 
-  const response = await gemini.models.generateContent({
-    model: 'gemini-2.5-flash-lite',
+  const response = await generateContentWithFallback({
     contents: prompt,
     config: {
       systemInstruction,

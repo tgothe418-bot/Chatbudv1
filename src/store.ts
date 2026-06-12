@@ -4,6 +4,7 @@ import { OntologyStoreState, DynamicPosture, PerceptualCapabilities, FunctionalC
 interface OntologyState extends OntologyStoreState {
   applyMutation: (proposedMutation: any) => void;
   applySmoothedPosture: (proposedPosture: Partial<DynamicPosture>) => void;
+  initializeWorld: (baseline: Partial<OntologyStoreState>) => void;
 }
 
 export const useOntologyStore = create<OntologyState>((set) => ({
@@ -12,6 +13,7 @@ export const useOntologyStore = create<OntologyState>((set) => ({
     createdAt: Date.now(),
     lastInteractionTimestamp: Date.now(),
   },
+  appPhase: 'FORGE',
   dynamic_posture: {
     resonance: 0.1,
     autonomy: 0.1,
@@ -35,6 +37,29 @@ export const useOntologyStore = create<OntologyState>((set) => ({
   },
   chatHistory: [],
   rollingSummary: null,
+
+  initializeWorld: (baseline) =>
+    set((state) => ({
+      appPhase: 'PLAYGROUND',
+      dynamic_posture: baseline.dynamic_posture || state.dynamic_posture,
+      perceptual_capabilities: {
+        ...state.perceptual_capabilities,
+        ...(baseline.perceptual_capabilities || {}),
+      },
+      functional_capabilities: {
+        ...state.functional_capabilities,
+        ...(baseline.functional_capabilities || {}),
+      },
+      world_state: {
+        identity: {
+          ...state.world_state.identity,
+          ...(baseline.world_state?.identity || {}),
+        },
+        environment_manifest: baseline.world_state?.environment_manifest || state.world_state.environment_manifest,
+      },
+      chatHistory: [],
+      rollingSummary: null,
+    })),
   
   applyMutation: (proposedMutation) =>
     set((state) => {

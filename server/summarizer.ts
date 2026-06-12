@@ -1,19 +1,6 @@
-import { GoogleGenAI } from '@google/genai';
-
-let ai: GoogleGenAI | null = null;
-function getGemini() {
-  if (!ai) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY is not set');
-    }
-    ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  }
-  return ai;
-}
+import { generateContentWithFallback } from './gemini_helper.js';
 
 export async function summarizeHistory(rollingSummary: string | null, messagesToCompress: { role: 'user' | 'model', content: string }[]): Promise<string> {
-  const gemini = getGemini();
-
   const systemInstruction = `You are a memory compression engine. Combine the existing summary with the provided chat logs to create a highly condensed, factual, bullet-point summary of the user's established facts, goals, and recent actions. Do not use conversational filler.`;
 
   const prompt = `
@@ -25,8 +12,7 @@ ${JSON.stringify(messagesToCompress, null, 2)}
 `;
 
   try {
-    const response = await gemini.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+    const response = await generateContentWithFallback({
       contents: prompt,
       config: {
         systemInstruction,

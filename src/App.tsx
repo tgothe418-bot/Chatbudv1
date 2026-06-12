@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useBicameralLoop } from './useBicameralLoop';
-import { Send } from 'lucide-react';
+import { useOntologyStore } from './store';
+import { Send, Pickaxe } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -10,9 +11,16 @@ interface Message {
 
 export default function App() {
   const { sendMessage, isLoading, error } = useBicameralLoop();
+  const appPhase = useOntologyStore((state) => state.appPhase);
+  const initializeWorld = useOntologyStore((state) => state.initializeWorld);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const [forgeInput, setForgeInput] = useState('');
+  const [isForging, setIsForging] = useState(false);
+  const [forgeError, setForgeError] = useState('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -21,6 +29,31 @@ export default function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const handleForgeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgeInput.trim() || isForging) return;
+    
+    setIsForging(true);
+    setForgeError('');
+    try {
+      const res = await fetch(`${window.location.origin}/api/forge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seedPrompt: forgeInput.trim() }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to process seed prompt in the Forge.');
+      }
+      const { baselineState } = await res.json();
+      initializeWorld(baselineState);
+    } catch (err: any) {
+      setForgeError(err.message || String(err));
+    } finally {
+      setIsForging(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +71,39 @@ export default function App() {
       // Error is handled by the hook and exposed via `error` state
     }
   };
+
+  if (appPhase === 'FORGE') {
+    return (
+      <div className="flex flex-col h-screen bg-zinc-950 text-zinc-400 font-sans sm:px-4 sm:py-6 lg:px-8 items-center justify-center">
+        <div className="w-full max-w-3xl flex flex-col bg-[#0c0c0e] sm:border sm:border-zinc-800/50 sm:shadow-[0_0_40px_rgba(0,0,0,0.5)] sm:rounded-3xl p-8 relative">
+          <div className="flex items-center justify-center mb-8 gap-3">
+            <Pickaxe className="w-6 h-6 text-zinc-500" />
+            <h1 className="text-zinc-600 text-sm tracking-[0.2em] uppercase font-medium">The Seed Forge</h1>
+          </div>
+          <p className="text-zinc-500 text-sm text-center mb-8 px-4 leading-relaxed">
+            Provide a configuration script, character profile, or sandbox ruleset. The Forge will compile your intent into a baseline state object.
+          </p>
+          <form onSubmit={handleForgeSubmit} className="flex flex-col gap-6">
+            <textarea
+              className="w-full h-40 bg-zinc-900/50 border border-zinc-800/60 rounded-xl p-4 text-zinc-300 text-sm focus:outline-none focus:border-zinc-700 focus:ring-1 focus:ring-zinc-700/50 resize-none shadow-inner shadow-black/20"
+              placeholder="e.g. You are a dense, deeply technical navigator terminal set in the year 2085. You see through a simulated monochrome HUD. Speak plainly and quickly."
+              value={forgeInput}
+              onChange={(e) => setForgeInput(e.target.value)}
+              disabled={isForging}
+            />
+            {forgeError && <p className="text-red-900/60 text-xs text-center">{forgeError}</p>}
+            <button
+              type="submit"
+              disabled={isForging || !forgeInput.trim()}
+              className="self-center bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/50 text-zinc-300 px-8 py-3 rounded-full text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg"
+            >
+              {isForging ? 'Compiling...' : 'Initialize World'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-400 font-sans sm:px-4 sm:py-6 lg:px-8 items-center justify-center">

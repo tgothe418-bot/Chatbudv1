@@ -1,16 +1,6 @@
-import { GoogleGenAI, Type, Schema } from '@google/genai';
+import { Type, Schema } from '@google/genai';
 import { OntologyStoreState } from '../src/types.js';
-
-let ai: GoogleGenAI | null = null;
-function getGemini() {
-  if (!ai) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY is not set');
-    }
-    ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  }
-  return ai;
-}
+import { generateContentWithFallback } from './gemini_helper.js';
 
 const responseSchema: Schema = {
   type: Type.OBJECT,
@@ -36,8 +26,6 @@ const responseSchema: Schema = {
 };
 
 export async function evaluateState(userInput: string, currentState: OntologyStoreState) {
-  const gemini = getGemini();
-
   const systemInstruction = `# ROLE
 You are the Right Chamber (System 2)—the silent, analytical, and objective state parsing engine of a bicameral cognitive system. You never communicate with the user directly. Your sole purpose is to ingest user inputs alongside the current canonical state, evaluate functional intent, and output a strict, minified JSON object proposing state mutations.
 
@@ -74,8 +62,7 @@ ${userInput}`;
 
   let response;
   try {
-    response = await gemini.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+    response = await generateContentWithFallback({
       contents: prompt,
       config: {
         systemInstruction,
@@ -85,7 +72,7 @@ ${userInput}`;
       }
     });
   } catch (error) {
-    console.error("Right Chamber Gemini API Error:", error);
+    console.error("Right Chamber Gemini API Error after trying all fallbacks:", error);
     throw error;
   }
 

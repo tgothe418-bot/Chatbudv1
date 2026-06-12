@@ -4,6 +4,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { evaluateState } from "./server/rightChamber.js";
 import { generateDialogue } from "./server/leftChamber.js";
+import { processSeedPrompt } from "./server/forgeAnalyst.js";
 
 import { summarizeHistory } from "./server/summarizer.js";
 
@@ -20,6 +21,21 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
+  app.post("/api/forge", async (req, res) => {
+    try {
+      const { seedPrompt } = req.body;
+      if (!seedPrompt) {
+         res.status(400).json({ error: "Missing seedPrompt text payload" });
+         return;
+      }
+      const baselineConfiguration = await processSeedPrompt(seedPrompt);
+      res.json({ baselineState: baselineConfiguration });
+    } catch (error: any) {
+      console.error("Forge Blueprint Endpoint Failure:", error);
+      res.status(500).json({ error: "Failed to process sandbox configuration script: " + error.message });
+    }
+  });
+
   app.post("/api/chat", async (req, res) => {
     try {
       const { userMessage, currentState } = req.body;
@@ -37,9 +53,15 @@ async function startServer() {
       
       // The Trigger: Micro-Nap
       if (currentState.chatHistory.length > 10) {
-        const messagesToCompress = currentState.chatHistory.splice(0, 6);
-        const newSummary = await summarizeHistory(currentState.rollingSummary, messagesToCompress);
-        currentState.rollingSummary = newSummary;
+        try {
+          const messagesToCompress = currentState.chatHistory.slice(0, 6);
+          const newSummary = await summarizeHistory(currentState.rollingSummary, messagesToCompress);
+          currentState.rollingSummary = newSummary;
+          // Only slice the history on successful compression
+          currentState.chatHistory.splice(0, 6);
+        } catch (summarizerError: any) {
+          console.error("Defensive Graceful Fallback: Failed to generate rolling summary:", summarizerError);
+        }
       }
 
       const proposedMutation = await evaluateState(userInput, currentState);
