@@ -33,6 +33,8 @@ export const useOntologyStore = create<OntologyState>((set) => ({
     },
     environment_manifest: [],
   },
+  chatHistory: [],
+  rollingSummary: null,
   
   applyMutation: (proposedMutation) =>
     set((state) => {

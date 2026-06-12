@@ -41,10 +41,17 @@ export interface WorldState {
   environment_manifest: string[];
 }
 
+export interface ChatMessage {
+  role: 'user' | 'model';
+  content: string;
+}
+
 export interface OntologyStoreState {
   meta: OntologyMeta;
   dynamic_posture: DynamicPosture;
   perceptual_capabilities: PerceptualCapabilities;
   functional_capabilities: FunctionalCapabilities;
   world_state: WorldState;
+  chatHistory: ChatMessage[];
+  rollingSummary: string | null;
 }

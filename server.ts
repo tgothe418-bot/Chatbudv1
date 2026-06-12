@@ -5,6 +5,8 @@ import { createServer as createViteServer } from "vite";
 import { evaluateState } from "./server/rightChamber.js";
 import { generateDialogue } from "./server/leftChamber.js";
 
+import { summarizeHistory } from "./server/summarizer.js";
+
 if (!process.env.GEMINI_API_KEY) {
   console.error("ERROR: GEMINI_API_KEY is missing!");
   console.error("Please configure it or create a .env file from the .env.example template.");
@@ -27,6 +29,19 @@ async function startServer() {
          return;
       }
       
+      // Ensure arrays exist
+      if (!currentState.chatHistory) currentState.chatHistory = [];
+      
+      // Append user message
+      currentState.chatHistory.push({ role: 'user', content: userInput });
+      
+      // The Trigger: Micro-Nap
+      if (currentState.chatHistory.length > 10) {
+        const messagesToCompress = currentState.chatHistory.splice(0, 6);
+        const newSummary = await summarizeHistory(currentState.rollingSummary, messagesToCompress);
+        currentState.rollingSummary = newSummary;
+      }
+
       const proposedMutation = await evaluateState(userInput, currentState);
       
       // Deep clone current state to create updated state
@@ -77,6 +92,9 @@ async function startServer() {
 
       // 3. Immediately pass this newly smoothed and updated state into the Left Chamber function.
       const reply = await generateDialogue(userInput, updatedState);
+      
+      // Append model message to history
+      updatedState.chatHistory.push({ role: 'model', content: reply });
       
       // 4. Return a single JSON payload to the frontend containing BOTH { textResponse, updatedState }
       res.json({ textResponse: reply, updatedState });
