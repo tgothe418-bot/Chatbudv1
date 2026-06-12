@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { useOntologyStore } from './store';
-import { submitToRightChamber, ProposedMutation } from './rightChamber';
-import { submitToLeftChamber } from './leftChamber';
+import { DynamicPosture, PerceptualCapabilities, FunctionalCapabilities } from './types';
+
+interface ProposedMutation {
+  dynamic_posture?: Partial<DynamicPosture>;
+  perceptual_capabilities?: Partial<PerceptualCapabilities>;
+  functional_capabilities?: Partial<FunctionalCapabilities>;
+}
 
 export function useBicameralLoop() {
   const [isLoading, setIsLoading] = useState(false);
@@ -16,7 +21,24 @@ export function useBicameralLoop() {
       const currentState = useOntologyStore.getState();
 
       // 2. Right Chamber Evaluates State
-      const proposedMutation: ProposedMutation = await submitToRightChamber(userInput, currentState);
+      const rightRes = await fetch(`${window.location.origin}/api/right-chamber`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userInput, currentState }),
+      });
+
+      if (!rightRes.ok) {
+        let errorMsg = 'Failed to evaluate state in the Right Chamber';
+        try {
+          const errData = await rightRes.json();
+          if (errData.error) errorMsg = errData.error;
+        } catch (e) {
+          // Fallback if not JSON
+        }
+        throw new Error(errorMsg);
+      }
+
+      const proposedMutation: ProposedMutation = await rightRes.json();
 
       // 3. Update Zustand Store
       // Update posture using the smoothing filter
@@ -57,9 +79,26 @@ export function useBicameralLoop() {
       const updatedState = useOntologyStore.getState();
 
       // 5. Left Chamber Generates Dialogue
-      const reply = await submitToLeftChamber(userInput, updatedState);
+      const leftRes = await fetch(`${window.location.origin}/api/left-chamber`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userInput, currentState: updatedState }),
+      });
 
-      return reply;
+      if (!leftRes.ok) {
+        let errorMsg = 'Failed to generate dialogue in the Left Chamber';
+        try {
+          const errData = await leftRes.json();
+          if (errData.error) errorMsg = errData.error;
+        } catch (e) {
+          // Fallback if not JSON
+        }
+        throw new Error(errorMsg);
+      }
+
+      const replyData = await leftRes.json();
+      return replyData.reply;
+
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'An error occurred in the bicameral loop');
