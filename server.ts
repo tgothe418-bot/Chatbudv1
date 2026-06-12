@@ -1,13 +1,20 @@
 import express from "express";
+import cors from "cors";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { evaluateState } from "./server/rightChamber.js";
 import { generateDialogue } from "./server/leftChamber.js";
 
+if (!process.env.GEMINI_API_KEY) {
+  console.error("ERROR: GEMINI_API_KEY is missing!");
+  console.error("Please configure it or create a .env file from the .env.example template.");
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
   app.use(express.json());
 
   // API Routes

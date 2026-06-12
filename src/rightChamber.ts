@@ -7,7 +7,7 @@ export interface ProposedMutation {
 }
 
 export async function submitToRightChamber(userInput: string, currentState: OntologyStoreState): Promise<ProposedMutation> {
-  const response = await fetch('/api/right-chamber', {
+  const response = await fetch(`${window.location.origin}/api/right-chamber`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userInput, currentState }),

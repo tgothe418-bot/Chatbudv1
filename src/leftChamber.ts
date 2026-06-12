@@ -1,7 +1,7 @@
 import { OntologyStoreState } from './types';
 
 export async function submitToLeftChamber(userInput: string, currentState: OntologyStoreState): Promise<string> {
-  const response = await fetch('/api/left-chamber', {
+  const response = await fetch(`${window.location.origin}/api/left-chamber`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userInput, currentState }),

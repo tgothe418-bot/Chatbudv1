@@ -77,5 +77,20 @@ ${userInput}`;
     throw new Error("No response returned from the model");
   }
 
-  return JSON.parse(response.text);
+  let rawText = response.text.trim();
+  if (rawText.startsWith('```json')) {
+    rawText = rawText.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+  } else if (rawText.startsWith('```')) {
+    rawText = rawText.replace(/^```\n?/, '').replace(/\n?```$/, '').trim();
+  }
+
+  try {
+    return JSON.parse(rawText);
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      console.error("SyntaxError parsing JSON from Right Chamber:", error);
+      console.error("Raw text was:", response.text);
+    }
+    throw error;
+  }
 }
