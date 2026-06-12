@@ -21,17 +21,17 @@ export function useBicameralLoop() {
       // 1. Get current state
       const currentState = useOntologyStore.getState();
 
-      // 2. Right Chamber Evaluates State
-      const rightRes = await fetch(`${window.location.origin}/api/right-chamber`, {
+      // 2. Fetch from new consolidated API route
+      const res = await fetch(`${window.location.origin}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userInput, currentState }),
+        body: JSON.stringify({ userMessage: userInput, currentState }),
       });
 
-      if (!rightRes.ok) {
-        let errorMsg = 'Failed to evaluate state in the Right Chamber';
+      if (!res.ok) {
+        let errorMsg = 'Failed to communicate with the Bicameral API';
         try {
-          const errData = await rightRes.json();
+          const errData = await res.json();
           if (errData.error) errorMsg = errData.error;
         } catch (e) {
           // Fallback if not JSON
@@ -39,48 +39,19 @@ export function useBicameralLoop() {
         throw new Error(errorMsg);
       }
 
-      const proposedMutation: ProposedMutation = await rightRes.json();
+      const { textResponse, updatedState } = await res.json();
 
-      // 3. Update Zustand Store
-      // Update posture using the smoothing filter
-      if (proposedMutation.dynamic_posture) {
-        currentState.applySmoothedPosture(proposedMutation.dynamic_posture);
-      }
-      
-      // Update capabilities and world state using deep merge
-      currentState.applyMutation(proposedMutation);
-
-      // Update interaction timestamp
-      useOntologyStore.setState((state) => ({
+      // 3. Update Zustand Store with the fully merged state from the server
+      useOntologyStore.setState({
+        ...updatedState,
         meta: {
-          ...state.meta,
+          ...updatedState.meta,
           lastInteractionTimestamp: Date.now(),
         }
-      }));
-
-      // 4. Get the newly updated state for the Left Chamber
-      const updatedState = useOntologyStore.getState();
-
-      // 5. Left Chamber Generates Dialogue
-      const leftRes = await fetch(`${window.location.origin}/api/left-chamber`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userInput, currentState: updatedState }),
       });
 
-      if (!leftRes.ok) {
-        let errorMsg = 'Failed to generate dialogue in the Left Chamber';
-        try {
-          const errData = await leftRes.json();
-          if (errData.error) errorMsg = errData.error;
-        } catch (e) {
-          // Fallback if not JSON
-        }
-        throw new Error(errorMsg);
-      }
-
-      const replyData = await leftRes.json();
-      return replyData.reply;
+      // 4. Return text response
+      return textResponse;
 
     } catch (err: any) {
       console.error('Full Error:', err);

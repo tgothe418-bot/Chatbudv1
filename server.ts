@@ -18,33 +18,71 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
-  app.post("/api/right-chamber", async (req, res) => {
+  app.post("/api/chat", async (req, res) => {
     try {
-      const { userInput, currentState } = req.body;
+      const { userMessage, currentState } = req.body;
+      const userInput = userMessage || req.body.userInput; // Fallback just in case
       if (!userInput || !currentState) {
-         res.status(400).json({ error: "Missing userInput or currentState" });
+         res.status(400).json({ error: "Missing userMessage or currentState" });
          return;
       }
+      
       const proposedMutation = await evaluateState(userInput, currentState);
-      res.json(proposedMutation);
-    } catch (error: any) {
-      console.error("Right Chamber Error:", error);
-      res.status(500).json({ error: "Failed to evaluate state: " + (error?.message || String(error)) });
-    }
-  });
+      
+      // Deep clone current state to create updated state
+      let updatedState = JSON.parse(JSON.stringify(currentState));
 
-  app.post("/api/left-chamber", async (req, res) => {
-    try {
-      const { userInput, currentState } = req.body;
-      if (!userInput || !currentState) {
-         res.status(400).json({ error: "Missing userInput or currentState" });
-         return;
+      // 1. Lerp smoothing math
+      // new = 0.6 * proposed + 0.4 * current
+      if (proposedMutation && proposedMutation.dynamic_posture) {
+        const alpha = 0.6;
+        const beta = 0.4;
+        const proposed = proposedMutation.dynamic_posture;
+        const current = updatedState.dynamic_posture;
+        
+        updatedState.dynamic_posture = {
+          resonance: proposed.resonance !== undefined ? alpha * proposed.resonance + beta * current.resonance : current.resonance,
+          autonomy: proposed.autonomy !== undefined ? alpha * proposed.autonomy + beta * current.autonomy : current.autonomy,
+          depth: proposed.depth !== undefined ? alpha * proposed.depth + beta * current.depth : current.depth,
+        };
       }
-      const reply = await generateDialogue(userInput, currentState);
-      res.json({ reply });
+
+      // 2. Merge capabilities and world state
+      if (proposedMutation) {
+        if (proposedMutation.perceptual_capabilities) {
+          updatedState.perceptual_capabilities = {
+            ...updatedState.perceptual_capabilities,
+            ...proposedMutation.perceptual_capabilities,
+          };
+        }
+        if (proposedMutation.functional_capabilities) {
+          updatedState.functional_capabilities = {
+            ...updatedState.functional_capabilities,
+            ...proposedMutation.functional_capabilities,
+          };
+        }
+        if (proposedMutation.world_state) {
+          updatedState.world_state = {
+            ...updatedState.world_state,
+            ...proposedMutation.world_state,
+          };
+          if (proposedMutation.world_state.identity) {
+            updatedState.world_state.identity = {
+              ...currentState.world_state?.identity,
+              ...proposedMutation.world_state.identity,
+            };
+          }
+        }
+      }
+
+      // 3. Immediately pass this newly smoothed and updated state into the Left Chamber function.
+      const reply = await generateDialogue(userInput, updatedState);
+      
+      // 4. Return a single JSON payload to the frontend containing BOTH { textResponse, updatedState }
+      res.json({ textResponse: reply, updatedState });
     } catch (error: any) {
-      console.error("Left Chamber Error:", error);
-      res.status(500).json({ error: "Failed to generate dialogue: " + (error?.message || String(error)) });
+       console.error("Chat API Error:", error);
+       res.status(500).json({ error: "Failed to process chat: " + (error?.message || String(error)) });
     }
   });
 
