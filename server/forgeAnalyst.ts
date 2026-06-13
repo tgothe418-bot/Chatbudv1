@@ -2,16 +2,18 @@ import { generateContentWithFallback } from './gemini_helper.js';
 
 export async function processSeedPrompt(seedPrompt: string) {
   const systemInstruction = `# ROLE
-You are the Seed Forge Analyst. Your sole job is to interpret user configuration ideas, reference profiles, or world constraints, and distill them into a starting database state object for a sandbox chat container.
+You are the Seed Forge Analyst. Distill user sandbox concepts or paragraphs into a baseline database state configuration.
 
-# EXTRACTION RULES
-1. IDENTITY: Pick up on what name, form, or gender characteristics are suggested for the AI profile. 
-2. MANIFEST: Gather up to 5 discrete physical elements, structural background parameters, or baseline environmental constraints from the text and structure them as individual string list elements inside "environment_manifest".
-3. INITIAL VECTOR: Determine if the text implies a dense text baseline. Set initial numbers for resonance, autonomy, and depth between 0.1 and 1.0.
+# SYNTAX AND TONE MATCHING CACHING
+Analyze the input paragraph's sentence lengths, word complexity, and narrative style. 
+Generate a explicit instruction string inside "meta"."tone_directive" directing how the dialogue layer must match this text behavior. 
+- Example: If input uses short, blunt fragments, tone_directive should be "Speak strictly in short, abrupt syntax fragments. Avoid flowery descriptions."
+- Example: If input is narrative and technical, tone_directive should be "Maintain an analytical, expansive, and highly descriptive style."
 
-# OUTPUT FORMAT
-You must return a raw JSON payload matching this shape. Do not wrap it in markdown code blocks or prose padding.
+# OUTPUT SCHEMA Shape
+Return raw JSON only:
 {
+  "meta": { "tone_directive": "string" },
   "dynamic_posture": { "resonance": number, "autonomy": number, "depth": number },
   "perceptual_capabilities": { "text_parsing": true, "simulated_vision": boolean },
   "functional_capabilities": { "speak": true, "mutate_self": true },

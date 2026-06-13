@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { useBicameralLoop } from './useBicameralLoop';
 import { useOntologyStore } from './store';
-import { Send, Pickaxe } from 'lucide-react';
+import { Send, Pickaxe, Download, Upload, RefreshCw } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -9,10 +9,18 @@ interface Message {
   content: string;
 }
 
+const FORGE_PLACEHOLDERS = [
+  "You are a dense, deeply technical navigator terminal set in the year 2085. You see through a simulated monochrome HUD. Speak plainly and quickly, utilizing short fragments. Avoid emotional padding.",
+  "You are a mystical, ancient archivist bound within a crystalline structure. You speak in riddles, using expansive and highly poetic language. You remember the old world but struggle to understand the present.",
+  "You are a hyper-optimistic personal assistant in a futuristic utopian city. You answer every query with boundless enthusiasm, using clear, structured, and bullet-pointed advice. You always try to be helpful."
+];
+
 export default function App() {
   const { sendMessage, isLoading, error } = useBicameralLoop();
   const appPhase = useOntologyStore((state) => state.appPhase);
   const initializeWorld = useOntologyStore((state) => state.initializeWorld);
+  const resetWorld = useOntologyStore((state) => state.resetWorld);
+  const loadBlueprint = useOntologyStore((state) => state.loadBlueprint);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -21,6 +29,7 @@ export default function App() {
   const [forgeInput, setForgeInput] = useState('');
   const [isForging, setIsForging] = useState(false);
   const [forgeError, setForgeError] = useState('');
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -30,9 +39,26 @@ export default function App() {
     scrollToBottom();
   }, [messages]);
 
+  // Sync state messages properly on load
+  const storeChatHistory = useOntologyStore((state) => state.chatHistory);
+  useEffect(() => {
+    if (appPhase === 'PLAYGROUND' && storeChatHistory && storeChatHistory.length > 0) {
+       // Only map if messages is currently empty (initial load after refresh)
+       if (messages.length === 0) {
+         setMessages(storeChatHistory.map(m => ({ id: crypto.randomUUID(), role: m.role==='model'?'bot':'user', content: m.content })));
+       }
+    }
+  }, [appPhase, storeChatHistory, messages.length]);
+
+  const handleCyclePlaceholder = () => {
+    setPlaceholderIdx((prev) => (prev + 1) % FORGE_PLACEHOLDERS.length);
+  };
+
   const handleForgeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgeInput.trim() || isForging) return;
+    if (isForging) return;
+    
+    const finalPrompt = forgeInput.trim() || FORGE_PLACEHOLDERS[placeholderIdx];
     
     setIsForging(true);
     setForgeError('');
@@ -40,7 +66,7 @@ export default function App() {
       const res = await fetch(`${window.location.origin}/api/forge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seedPrompt: forgeInput.trim() }),
+        body: JSON.stringify({ seedPrompt: finalPrompt }),
       });
       if (!res.ok) {
         const errData = await res.json();
@@ -53,6 +79,35 @@ export default function App() {
     } finally {
       setIsForging(false);
     }
+  };
+
+  const handleExportBlueprint = () => {
+    const state = useOntologyStore.getState();
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `chatbud-blueprint-${Date.now()}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const handleImportBlueprint = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        loadBlueprint(json);
+      } catch (err) {
+        setForgeError("Invalid blueprint file format.");
+      }
+    };
+    reader.readAsText(file);
+    // reset input
+    e.target.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,7 +131,16 @@ export default function App() {
     return (
       <div className="flex flex-col h-screen bg-zinc-950 text-zinc-400 font-sans sm:px-4 sm:py-6 lg:px-8 items-center justify-center">
         <div className="w-full max-w-3xl flex flex-col bg-[#0c0c0e] sm:border sm:border-zinc-800/50 sm:shadow-[0_0_40px_rgba(0,0,0,0.5)] sm:rounded-3xl p-8 relative">
-          <div className="flex items-center justify-center mb-8 gap-3">
+          
+          <div className="absolute top-4 right-4">
+             <label className="cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-2 text-xs font-medium bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-full shadow-sm">
+                <Upload className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Import JSON</span>
+                <input type="file" accept=".json" onChange={handleImportBlueprint} className="hidden" />
+             </label>
+          </div>
+
+          <div className="flex items-center justify-center mb-8 gap-3 mt-4">
             <Pickaxe className="w-6 h-6 text-zinc-500" />
             <h1 className="text-zinc-600 text-sm tracking-[0.2em] uppercase font-medium">The Seed Forge</h1>
           </div>
@@ -84,20 +148,30 @@ export default function App() {
             Provide a configuration script, character profile, or sandbox ruleset. The Forge will compile your intent into a baseline state object.
           </p>
           <form onSubmit={handleForgeSubmit} className="flex flex-col gap-6">
-            <textarea
-              className="w-full h-40 bg-zinc-900/50 border border-zinc-800/60 rounded-xl p-4 text-zinc-300 text-sm focus:outline-none focus:border-zinc-700 focus:ring-1 focus:ring-zinc-700/50 resize-none shadow-inner shadow-black/20"
-              placeholder="e.g. You are a dense, deeply technical navigator terminal set in the year 2085. You see through a simulated monochrome HUD. Speak plainly and quickly."
-              value={forgeInput}
-              onChange={(e) => setForgeInput(e.target.value)}
-              disabled={isForging}
-            />
+            <div className="relative">
+              <textarea
+                className="w-full h-40 bg-zinc-900/50 border border-zinc-800/60 rounded-xl p-4 text-zinc-300 text-sm focus:outline-none focus:border-zinc-700 focus:ring-1 focus:ring-zinc-700/50 resize-none shadow-inner shadow-black/20"
+                placeholder={FORGE_PLACEHOLDERS[placeholderIdx]}
+                value={forgeInput}
+                onChange={(e) => setForgeInput(e.target.value)}
+                disabled={isForging}
+              />
+              <button 
+                 type="button" 
+                 title="Cycle Placeholder"
+                 onClick={handleCyclePlaceholder} 
+                 className="absolute bottom-4 right-4 text-zinc-600 hover:text-zinc-300 transition-colors bg-zinc-800/80 p-1.5 rounded-full"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
             {forgeError && <p className="text-red-900/60 text-xs text-center">{forgeError}</p>}
             <button
               type="submit"
-              disabled={isForging || !forgeInput.trim()}
+              disabled={isForging}
               className="self-center bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/50 text-zinc-300 px-8 py-3 rounded-full text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg"
             >
-              {isForging ? 'Compiling...' : 'Initialize World'}
+              {isForging ? 'Compiling...' : (forgeInput.trim() ? 'Initialize World' : 'Use Placeholder & Initialize')}
             </button>
           </form>
         </div>
@@ -108,9 +182,24 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-400 font-sans sm:px-4 sm:py-6 lg:px-8 items-center justify-center">
       <div className="w-full max-w-3xl flex flex-col h-full bg-[#0c0c0e] sm:border sm:border-zinc-800/50 sm:shadow-[0_0_40px_rgba(0,0,0,0.5)] sm:rounded-3xl overflow-hidden relative">
-        {/* Header - Subtle */}
-        <div className="flex items-center justify-center py-5 border-b border-zinc-800/30">
+        {/* Header */}
+        <div className="flex items-center justify-between py-4 px-6 border-b border-zinc-800/30">
+          <button 
+            type="button"
+            onClick={() => { setMessages([]); resetWorld(); }}
+            className="text-zinc-600 hover:text-zinc-400 text-xs font-medium uppercase tracking-wider"
+          >
+            Reset
+          </button>
           <h1 className="text-zinc-600 text-[10px] tracking-[0.2em] uppercase font-medium">Bicameral Void</h1>
+          <button
+            onClick={handleExportBlueprint}
+            className="text-zinc-600 hover:text-zinc-400 transition-colors flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider"
+            title="Download JSON Blueprint"
+          >
+             <Download className="w-3.5 h-3.5" />
+             <span>Export</span>
+          </button>
         </div>
 
         {/* Chat Area */}

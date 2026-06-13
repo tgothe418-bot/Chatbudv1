@@ -7,6 +7,7 @@ export interface OntologyMeta {
   sessionId: string;
   createdAt: number;
   lastInteractionTimestamp: number;
+  tone_directive?: string;
 }
 
 export interface DynamicPosture {
