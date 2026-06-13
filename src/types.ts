@@ -49,7 +49,7 @@ export interface ChatMessage {
 
 export interface OntologyStoreState {
   meta: OntologyMeta;
-  appPhase: 'FORGE' | 'PLAYGROUND';
+  appPhase: 'BOOT' | 'FORGE' | 'PLAYGROUND';
   dynamic_posture: DynamicPosture;
   perceptual_capabilities: PerceptualCapabilities;
   functional_capabilities: FunctionalCapabilities;

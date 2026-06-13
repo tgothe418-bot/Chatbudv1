@@ -50,6 +50,18 @@ export default function App() {
     }
   }, [appPhase, storeChatHistory, messages.length]);
 
+  // Trigger the Opening Move when entering Playground with an empty chat history
+  useEffect(() => {
+    const state = useOntologyStore.getState();
+    if (state.appPhase === 'PLAYGROUND' && state.chatHistory.length === 0 && !isLoading) {
+       sendMessage('__SYSTEM_INIT__')
+         .then((reply) => {
+           setMessages([{ id: crypto.randomUUID(), role: 'bot', content: reply }]);
+         })
+         .catch(console.error);
+    }
+  }, [appPhase]);
+
   const handleCyclePlaceholder = () => {
     setPlaceholderIdx((prev) => (prev + 1) % FORGE_PLACEHOLDERS.length);
   };
@@ -110,6 +122,24 @@ export default function App() {
     e.target.value = '';
   };
 
+  const [flushState, setFlushState] = useState<'idle' | 'success' | 'error'>('idle');
+
+  const handleSystemFlush = () => {
+    if (confirm("Are you sure you want to permanently purge all active memory, chat logs, and cached world parameters? This cannot be undone.")) {
+      try {
+        useOntologyStore.getState().flushStore();
+        localStorage.removeItem('chatbud-ontology-persistence');
+        setFlushState('success');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } catch (err) {
+        console.error("Flush failed:", err);
+        setFlushState('error');
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -126,6 +156,54 @@ export default function App() {
       // Error is handled by the hook and exposed via `error` state
     }
   };
+
+  if (appPhase === 'BOOT') {
+    return (
+      <div className="flex flex-col h-screen bg-zinc-950 text-zinc-400 font-sans items-center justify-center relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-zinc-800/10 rounded-full blur-[100px] pointer-events-none" />
+        
+        <div className="w-full max-w-xl flex flex-col bg-[#0c0c0e]/80 sm:border sm:border-zinc-800/50 sm:shadow-[0_0_40px_rgba(0,0,0,0.5)] sm:rounded-3xl p-12 text-center items-center z-10 backdrop-blur-sm">
+          <div className="w-20 h-20 rounded-full border border-zinc-700/50 bg-zinc-900/50 flex items-center justify-center mb-8 shadow-inner">
+            <span className="text-zinc-500 tracking-[0.2em] text-[10px] uppercase font-mono">System</span>
+          </div>
+          <h1 className="text-2xl font-light tracking-[0.2em] text-zinc-300 mb-4 uppercase">Bicameral Void</h1>
+          <p className="text-zinc-500 text-sm mb-12 max-w-sm leading-relaxed">
+            Initialize a new sandbox environment or permanently purge local memory cache.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+            <button
+               onClick={() => useOntologyStore.getState().startForge()}
+               className="bg-zinc-200 text-zinc-900 hover:bg-white px-8 py-3 rounded-full text-sm font-medium transition-all shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] tracking-wide"
+            >
+               Initialize Forge
+            </button>
+            <button
+               onClick={handleSystemFlush}
+               className="bg-red-950/20 text-red-500 border border-red-900/30 hover:bg-red-900/40 px-8 py-3 rounded-full text-sm font-medium transition-all tracking-wide"
+            >
+               Flush Memory
+            </button>
+          </div>
+          
+          {/* Graphical Feedback */}
+          <div className="h-8 mt-6">
+            {flushState === 'success' && (
+              <p className="text-green-500/80 text-xs tracking-widest uppercase animate-pulse">
+                [ Memory Purged. Rebooting... ]
+              </p>
+            )}
+            {flushState === 'error' && (
+              <p className="text-red-500/80 text-xs tracking-widest uppercase">
+                [ Flush Failed ]
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (appPhase === 'FORGE') {
     return (
@@ -184,13 +262,22 @@ export default function App() {
       <div className="w-full max-w-3xl flex flex-col h-full bg-[#0c0c0e] sm:border sm:border-zinc-800/50 sm:shadow-[0_0_40px_rgba(0,0,0,0.5)] sm:rounded-3xl overflow-hidden relative">
         {/* Header */}
         <div className="flex items-center justify-between py-4 px-6 border-b border-zinc-800/30">
-          <button 
-            type="button"
-            onClick={() => { setMessages([]); resetWorld(); }}
-            className="text-zinc-600 hover:text-zinc-400 text-xs font-medium uppercase tracking-wider"
-          >
-            Reset
-          </button>
+          <div className="flex items-center gap-4">
+            <button 
+              type="button"
+              onClick={() => { setMessages([]); resetWorld(); }}
+              className="text-zinc-600 hover:text-zinc-400 text-xs font-medium uppercase tracking-wider"
+            >
+              Reset
+            </button>
+            <button 
+              type="button"
+              onClick={handleSystemFlush}
+              className="text-red-500/80 hover:text-red-400 transition-colors text-[10px] font-medium uppercase tracking-wider"
+            >
+              Flush
+            </button>
+          </div>
           <h1 className="text-zinc-600 text-[10px] tracking-[0.2em] uppercase font-medium">Bicameral Void</h1>
           <button
             onClick={handleExportBlueprint}

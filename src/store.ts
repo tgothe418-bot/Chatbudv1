@@ -2,46 +2,34 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { OntologyStoreState, DynamicPosture, PerceptualCapabilities, FunctionalCapabilities, WorldState } from './types';
 
+const initialBlankState = {
+  meta: { sessionId: 'sandbox-v1', createdAt: Date.now(), lastInteractionTimestamp: Date.now(), tone_directive: '' },
+  appPhase: 'BOOT' as const,
+  dynamic_posture: { resonance: 0.1, autonomy: 0.1, depth: 0.1 },
+  perceptual_capabilities: { text_parsing: true, simulated_vision: false },
+  functional_capabilities: { speak: true, mutate_self: true },
+  world_state: { 
+    identity: { name: 'Unknown', gender: 'Unknown', form: 'formless_void' }, 
+    environment_manifest: [] 
+  },
+  chatHistory: [],
+  rollingSummary: null,
+};
+
 interface OntologyState extends OntologyStoreState {
   applyMutation: (proposedMutation: any) => void;
   applySmoothedPosture: (proposedPosture: Partial<DynamicPosture>) => void;
   initializeWorld: (baseline: Partial<OntologyStoreState>) => void;
   loadBlueprint: (fullState: Partial<OntologyStoreState>) => void;
   resetWorld: () => void;
+  startForge: () => void;
+  flushStore: () => void;
 }
 
 export const useOntologyStore = create<OntologyState>()(
   persist(
     (set) => ({
-      meta: {
-        sessionId: 'sandbox-v1',
-        createdAt: Date.now(),
-        lastInteractionTimestamp: Date.now(),
-      },
-      appPhase: 'FORGE',
-      dynamic_posture: {
-        resonance: 0.1,
-        autonomy: 0.1,
-        depth: 0.1,
-      },
-      perceptual_capabilities: {
-        text_parsing: true,
-        simulated_vision: false,
-      },
-      functional_capabilities: {
-        speak: true,
-        mutate_self: true,
-      },
-      world_state: {
-        identity: {
-          name: 'Unknown',
-          gender: 'Unknown',
-          form: 'formless_void',
-        },
-        environment_manifest: [],
-      },
-      chatHistory: [],
-      rollingSummary: null,
+      ...initialBlankState,
 
       initializeWorld: (baseline) =>
         set((state) => ({
@@ -79,6 +67,10 @@ export const useOntologyStore = create<OntologyState>()(
           chatHistory: [],
           rollingSummary: null,
         })),
+
+      startForge: () => set(() => ({ appPhase: 'FORGE' })),
+
+      flushStore: () => set(() => ({ ...initialBlankState })),
         
       applyMutation: (proposedMutation) =>
         set((state) => {

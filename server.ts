@@ -47,6 +47,8 @@ async function startServer() {
          return;
       }
       
+      const isInit = userInput === '__SYSTEM_INIT__';
+
       // Ensure arrays exist
       if (!currentState.chatHistory) currentState.chatHistory = [];
       
@@ -56,68 +58,72 @@ async function startServer() {
           backgroundSummaries.delete(currentState.meta.sessionId);
       }
 
-      // Append user message
-      currentState.chatHistory.push({ role: 'user', content: userInput });
-      
-      // The Trigger: Micro-Nap
-      if (currentState.chatHistory.length > 10) {
-        const messagesToCompress = currentState.chatHistory.slice(0, 6);
-        // Remove 'await' - fire background promise out-of-band
-        summarizeHistory(currentState.rollingSummary, messagesToCompress)
-          .then((newSummary) => {
-            // Apply memory shifts asynchronously to state for subsequent turns
-            currentState.rollingSummary = newSummary;
-          })
-          .catch((err) => console.error("Non-blocking summarizer failure:", err));
-
-        // Forcefully splice history instantly to clear context window bloat immediately
-        currentState.chatHistory.splice(0, 6);
-      }
-
-      const proposedMutation = await evaluateState(userInput, currentState);
-      
-      // Deep clone current state to create updated state
       let updatedState = JSON.parse(JSON.stringify(currentState));
 
-      // 1. Lerp smoothing math
-      // new = 0.6 * proposed + 0.4 * current
-      if (proposedMutation && proposedMutation.dynamic_posture) {
-        const alpha = 0.6;
-        const beta = 0.4;
-        const proposed = proposedMutation.dynamic_posture;
-        const current = updatedState.dynamic_posture;
+      if (!isInit) {
+        // Append user message
+        currentState.chatHistory.push({ role: 'user', content: userInput });
         
-        updatedState.dynamic_posture = {
-          resonance: proposed.resonance !== undefined ? alpha * proposed.resonance + beta * current.resonance : current.resonance,
-          autonomy: proposed.autonomy !== undefined ? alpha * proposed.autonomy + beta * current.autonomy : current.autonomy,
-          depth: proposed.depth !== undefined ? alpha * proposed.depth + beta * current.depth : current.depth,
-        };
-      }
+        // The Trigger: Micro-Nap
+        if (currentState.chatHistory.length > 10) {
+          const messagesToCompress = currentState.chatHistory.slice(0, 6);
+          // Remove 'await' - fire background promise out-of-band
+          summarizeHistory(currentState.rollingSummary, messagesToCompress)
+            .then((newSummary) => {
+              // Apply memory shifts asynchronously to state for subsequent turns
+              currentState.rollingSummary = newSummary;
+            })
+            .catch((err) => console.error("Non-blocking summarizer failure:", err));
 
-      // 2. Merge capabilities and world state
-      if (proposedMutation) {
-        if (proposedMutation.perceptual_capabilities) {
-          updatedState.perceptual_capabilities = {
-            ...updatedState.perceptual_capabilities,
-            ...proposedMutation.perceptual_capabilities,
+          // Forcefully splice history instantly to clear context window bloat immediately
+          currentState.chatHistory.splice(0, 6);
+        }
+
+        const proposedMutation = await evaluateState(userInput, currentState);
+        
+        // Deep clone current state to create updated state
+        updatedState = JSON.parse(JSON.stringify(currentState));
+
+        // 1. Lerp smoothing math
+        // new = 0.6 * proposed + 0.4 * current
+        if (proposedMutation && proposedMutation.dynamic_posture) {
+          const alpha = 0.6;
+          const beta = 0.4;
+          const proposed = proposedMutation.dynamic_posture;
+          const current = updatedState.dynamic_posture;
+          
+          updatedState.dynamic_posture = {
+            resonance: proposed.resonance !== undefined ? alpha * proposed.resonance + beta * current.resonance : current.resonance,
+            autonomy: proposed.autonomy !== undefined ? alpha * proposed.autonomy + beta * current.autonomy : current.autonomy,
+            depth: proposed.depth !== undefined ? alpha * proposed.depth + beta * current.depth : current.depth,
           };
         }
-        if (proposedMutation.functional_capabilities) {
-          updatedState.functional_capabilities = {
-            ...updatedState.functional_capabilities,
-            ...proposedMutation.functional_capabilities,
-          };
-        }
-        if (proposedMutation.world_state) {
-          updatedState.world_state = {
-            ...updatedState.world_state,
-            ...proposedMutation.world_state,
-          };
-          if (proposedMutation.world_state.identity) {
-            updatedState.world_state.identity = {
-              ...currentState.world_state?.identity,
-              ...proposedMutation.world_state.identity,
+
+        // 2. Merge capabilities and world state
+        if (proposedMutation) {
+          if (proposedMutation.perceptual_capabilities) {
+            updatedState.perceptual_capabilities = {
+              ...updatedState.perceptual_capabilities,
+              ...proposedMutation.perceptual_capabilities,
             };
+          }
+          if (proposedMutation.functional_capabilities) {
+            updatedState.functional_capabilities = {
+              ...updatedState.functional_capabilities,
+              ...proposedMutation.functional_capabilities,
+            };
+          }
+          if (proposedMutation.world_state) {
+            updatedState.world_state = {
+              ...updatedState.world_state,
+              ...proposedMutation.world_state,
+            };
+            if (proposedMutation.world_state.identity) {
+              updatedState.world_state.identity = {
+                ...currentState.world_state?.identity,
+                ...proposedMutation.world_state.identity,
+              };
+            }
           }
         }
       }
