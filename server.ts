@@ -8,6 +8,8 @@ import { processSeedPrompt } from "./server/forgeAnalyst.js";
 
 import { summarizeHistory } from "./server/summarizer.js";
 
+const backgroundSummaries = new Map<string, string>();
+
 if (!process.env.GEMINI_API_KEY) {
   console.error("ERROR: GEMINI_API_KEY is missing!");
   console.error("Please configure it or create a .env file from the .env.example template.");
@@ -48,20 +50,28 @@ async function startServer() {
       // Ensure arrays exist
       if (!currentState.chatHistory) currentState.chatHistory = [];
       
+      // Inject the latest background summary if we got one!
+      if (currentState.meta?.sessionId && backgroundSummaries.has(currentState.meta.sessionId)) {
+          currentState.rollingSummary = backgroundSummaries.get(currentState.meta.sessionId);
+          backgroundSummaries.delete(currentState.meta.sessionId);
+      }
+
       // Append user message
       currentState.chatHistory.push({ role: 'user', content: userInput });
       
       // The Trigger: Micro-Nap
       if (currentState.chatHistory.length > 10) {
-        try {
-          const messagesToCompress = currentState.chatHistory.slice(0, 6);
-          const newSummary = await summarizeHistory(currentState.rollingSummary, messagesToCompress);
-          currentState.rollingSummary = newSummary;
-          // Only slice the history on successful compression
-          currentState.chatHistory.splice(0, 6);
-        } catch (summarizerError: any) {
-          console.error("Defensive Graceful Fallback: Failed to generate rolling summary:", summarizerError);
-        }
+        const messagesToCompress = currentState.chatHistory.slice(0, 6);
+        // Remove 'await' - fire background promise out-of-band
+        summarizeHistory(currentState.rollingSummary, messagesToCompress)
+          .then((newSummary) => {
+            // Apply memory shifts asynchronously to state for subsequent turns
+            currentState.rollingSummary = newSummary;
+          })
+          .catch((err) => console.error("Non-blocking summarizer failure:", err));
+
+        // Forcefully splice history instantly to clear context window bloat immediately
+        currentState.chatHistory.splice(0, 6);
       }
 
       const proposedMutation = await evaluateState(userInput, currentState);

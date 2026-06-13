@@ -1,6 +1,7 @@
 import { Type, Schema } from '@google/genai';
 import { OntologyStoreState } from '../src/types.js';
 import { generateContentWithFallback } from './gemini_helper.js';
+import { safeJsonParse } from './jsonHelper.js';
 
 const responseSchema: Schema = {
   type: Type.OBJECT,
@@ -81,21 +82,8 @@ ${userInput}`;
     return currentState;
   }
 
-  let rawText = response.text.trim();
-  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    rawText = jsonMatch[0];
-  } else {
-    // If no curly braces found at all, try the old fallback
-    if (rawText.startsWith('```json')) {
-      rawText = rawText.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
-    } else if (rawText.startsWith('```')) {
-      rawText = rawText.replace(/^```\n?/, '').replace(/\n?```$/, '').trim();
-    }
-  }
-
   try {
-    const parsed = JSON.parse(rawText);
+    const parsed = safeJsonParse(response.text);
     return parsed.proposed_mutation || parsed;
   } catch (error) {
     console.error("SyntaxError parsing JSON from Right Chamber:", error);

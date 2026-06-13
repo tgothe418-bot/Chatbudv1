@@ -1,4 +1,5 @@
 import { generateContentWithFallback } from './gemini_helper.js';
+import { safeJsonParse } from './jsonHelper.js';
 
 export async function processSeedPrompt(seedPrompt: string) {
   const systemInstruction = `# ROLE
@@ -34,8 +35,7 @@ Return raw JSON only:
     });
 
     const text = response.text || "{}";
-    const cleanJson = text.replace(/\\{[\\s\\S]*\\}/, (match) => match) || text;
-    return JSON.parse(cleanJson);
+    return safeJsonParse(text);
   } catch (error) {
     console.error("Forge Analyst Processing Error:", error);
     throw error;
